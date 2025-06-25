@@ -1,9 +1,12 @@
 package options;
 
+import flixel.math.FlxPoint;
+
 import backend.StageData;
 import objects.Character;
-import objects.Bar;
+import objects.HealthBar;
 import flixel.addons.display.shapes.FlxShapeCircle;
+import online.substates.RoomSettingsSubstate.Option as SwagOption;
 
 import states.stages.StageWeek1 as BackgroundStage;
 
@@ -25,7 +28,7 @@ class NoteOffsetState extends MusicBeatState
 	var barPercent:Float = 0;
 	var delayMin:Int = -500;
 	var delayMax:Int = 500;
-	var timeBar:Bar;
+	var timeBar:HealthBar;
 	var timeTxt:FlxText;
 	var beatText:Alphabet;
 	var beatTween:FlxTween;
@@ -35,23 +38,45 @@ class NoteOffsetState extends MusicBeatState
 	var controllerPointer:FlxSprite;
 	var _lastControllerMode:Bool = false;
 
+	var isP1:Bool = true;
+	var isOnline:Bool = false;
+	var switchOnline:SwagOption;
+	var switchPlayerOption:SwagOption;
+
+	function getComboOffset() {
+		if (!isOnline) {
+			return ClientPrefs.data.comboOffset;
+		}
+
+		if (isP1)
+			return ClientPrefs.data.comboOffsetOP1;
+		else
+			return ClientPrefs.data.comboOffsetOP2;
+	}
+
+	function getComboPos() {
+		var placement:Float = FlxG.width * 0.35;
+		if (isOnline) {
+			placement = FlxG.width * (0.30 + (!isP1 ? 0.1 : -0.1));
+		}
+		return placement;
+	}
+
 	override public function create()
 	{
-		#if DISCORD_ALLOWED
-		DiscordClient.changePresence("Delay/Combo Offset Menu", null);
-		#end
-
 		// Cameras
-		camGame = initPsychCamera();
-
+		camGame = new FlxCamera();
 		camHUD = new FlxCamera();
-		camHUD.bgColor.alpha = 0;
-		FlxG.cameras.add(camHUD, false);
-
 		camOther = new FlxCamera();
+		camHUD.bgColor.alpha = 0;
 		camOther.bgColor.alpha = 0;
+
+		FlxG.cameras.reset(camGame);
+		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);
 
+		FlxG.cameras.setDefaultDrawTarget(camGame, true);
+		CustomFadeTransition.nextCamera = camOther;
 		FlxG.camera.scroll.set(120, 130);
 
 		persistentUpdate = true;
@@ -115,7 +140,7 @@ class NoteOffsetState extends MusicBeatState
 		repositionCombo();
 
 		// Note delay stuff
-		beatText = new Alphabet(0, 0, Language.getPhrase('delay_beat_hit', 'Beat Hit!'), true);
+		beatText = new Alphabet(0, 0, 'Beat Hit!', true);
 		beatText.setScale(0.6, 0.6);
 		beatText.x += 260;
 		beatText.alpha = 0;
@@ -133,7 +158,7 @@ class NoteOffsetState extends MusicBeatState
 		barPercent = ClientPrefs.data.noteOffset;
 		updateNoteDelay();
 		
-		timeBar = new Bar(0, timeTxt.y + (timeTxt.height / 3), 'healthBar', function() return barPercent, delayMin, delayMax);
+		timeBar = new HealthBar(0, timeTxt.y + (timeTxt.height / 3), 'healthBar', function() return barPercent, delayMin, delayMax);
 		timeBar.scrollFactor.set();
 		timeBar.screenCenter(X);
 		timeBar.visible = false;
@@ -163,6 +188,48 @@ class NoteOffsetState extends MusicBeatState
 		controllerPointer.alpha = 0.6;
 		controllerPointer.cameras = [camHUD];
 		add(controllerPointer);
+
+		add(switchPlayerOption = new SwagOption("Switch Players", "If checked, the combo offset of player 2 will be chosen.", () -> {
+			if (!onComboMenu || !isOnline)
+				return;
+
+			isP1 = !isP1;
+			repositionCombo();
+		}, (elapsed) -> {
+			if (holdingObjectType == null && FlxG.mouse.overlaps(switchPlayerOption.checkbox, camHUD) && FlxG.mouse.justPressed) {
+				switchPlayerOption.onClick();
+			}
+
+			switchPlayerOption.visible = onComboMenu;
+			switchPlayerOption.checked = !isP1;
+			switchPlayerOption.alpha = 1;
+			if (!isOnline) {
+				switchPlayerOption.alpha = 0.6;
+			}
+		}, 0, 0, !isP1));
+		switchPlayerOption.cameras = [camHUD];
+		switchPlayerOption.box.visible = true;
+		switchPlayerOption.x = 20;
+		switchPlayerOption.y = FlxG.height - switchPlayerOption.height - 20;
+
+		add(switchOnline = new SwagOption("Online Placements", "If checked, online offsets are used.", () -> {
+			if (!onComboMenu)
+				return;
+
+			isOnline = !isOnline;
+			repositionCombo();
+		}, (elapsed) -> {
+			if (holdingObjectType == null && FlxG.mouse.overlaps(switchOnline.checkbox, camHUD) && FlxG.mouse.justPressed) {
+				switchOnline.onClick();
+			}
+
+			switchOnline.visible = onComboMenu;
+			switchOnline.checked = isOnline;
+		}, 0, 0, isOnline));
+		switchOnline.cameras = [camHUD];
+		switchOnline.box.visible = true;
+		switchOnline.x = switchPlayerOption.x;
+		switchOnline.y = switchPlayerOption.y - switchOnline.height - 10;
 		
 		updateMode();
 		_lastControllerMode = true;
@@ -254,21 +321,21 @@ class NoteOffsetState extends MusicBeatState
 							switch(i)
 							{
 								case 0:
-									ClientPrefs.data.comboOffset[0] -= addNum;
+									getComboOffset()[0] -= addNum;
 								case 1:
-									ClientPrefs.data.comboOffset[0] += addNum;
+									getComboOffset()[0] += addNum;
 								case 2:
-									ClientPrefs.data.comboOffset[1] += addNum;
+									getComboOffset()[1] += addNum;
 								case 3:
-									ClientPrefs.data.comboOffset[1] -= addNum;
+									getComboOffset()[1] -= addNum;
 								case 4:
-									ClientPrefs.data.comboOffset[2] -= addNum;
+									getComboOffset()[2] -= addNum;
 								case 5:
-									ClientPrefs.data.comboOffset[2] += addNum;
+									getComboOffset()[2] += addNum;
 								case 6:
-									ClientPrefs.data.comboOffset[3] += addNum;
+									getComboOffset()[3] += addNum;
 								case 7:
-									ClientPrefs.data.comboOffset[3] -= addNum;
+									getComboOffset()[3] -= addNum;
 							}
 						}
 					}
@@ -311,16 +378,16 @@ class NoteOffsetState extends MusicBeatState
 					startMousePos.y - comboNums.y >= 0 && startMousePos.y - comboNums.y <= comboNums.height)
 				{
 					holdingObjectType = true;
-					startComboOffset.x = ClientPrefs.data.comboOffset[2];
-					startComboOffset.y = ClientPrefs.data.comboOffset[3];
+					startComboOffset.x = getComboOffset()[2];
+					startComboOffset.y = getComboOffset()[3];
 					//trace('yo bro');
 				}
 				else if (startMousePos.x - rating.x >= 0 && startMousePos.x - rating.x <= rating.width &&
 						 startMousePos.y - rating.y >= 0 && startMousePos.y - rating.y <= rating.height)
 				{
 					holdingObjectType = false;
-					startComboOffset.x = ClientPrefs.data.comboOffset[0];
-					startComboOffset.y = ClientPrefs.data.comboOffset[1];
+					startComboOffset.x = getComboOffset()[0];
+					startComboOffset.y = getComboOffset()[1];
 					//trace('heya');
 				}
 			}
@@ -340,17 +407,17 @@ class NoteOffsetState extends MusicBeatState
 						mousePos = controllerPointer.getScreenPosition(camHUD);
 
 					var addNum:Int = holdingObjectType ? 2 : 0;
-					ClientPrefs.data.comboOffset[addNum + 0] = Math.round((mousePos.x - startMousePos.x) + startComboOffset.x);
-					ClientPrefs.data.comboOffset[addNum + 1] = -Math.round((mousePos.y - startMousePos.y) - startComboOffset.y);
+					getComboOffset()[addNum + 0] = Math.round((mousePos.x - startMousePos.x) + startComboOffset.x);
+					getComboOffset()[addNum + 1] = -Math.round((mousePos.y - startMousePos.y) - startComboOffset.y);
 					repositionCombo();
 				}
 			}
 
-			if(controls.RESET)
+			if(touchPad.buttonC.justPressed || controls.RESET)
 			{
-				for (i in 0...ClientPrefs.data.comboOffset.length)
+				for (i in 0...getComboOffset().length)
 				{
-					ClientPrefs.data.comboOffset[i] = 0;
+					getComboOffset()[i] = 0;
 				}
 				repositionCombo();
 			}
@@ -384,7 +451,7 @@ class NoteOffsetState extends MusicBeatState
 				updateNoteDelay();
 			}
 
-			if(controls.RESET)
+			if(touchPad.buttonC.justPressed || controls.RESET)
 			{
 				holdTime = 0;
 				barPercent = 0;
@@ -405,7 +472,8 @@ class NoteOffsetState extends MusicBeatState
 			if(beatTween != null) beatTween.cancel();
 
 			persistentUpdate = false;
-			MusicBeatState.switchState(new options.OptionsState());
+			CustomFadeTransition.nextCamera = camOther;
+			FlxG.switchState(() -> new options.OptionsState());
 			if(OptionsState.onPlayState)
 			{
 				if(ClientPrefs.data.pauseMusic != 'None')
@@ -413,7 +481,8 @@ class NoteOffsetState extends MusicBeatState
 				else
 					FlxG.sound.music.volume = 0;
 			}
-			else FlxG.sound.playMusic(Paths.music('freakyMenu'));
+			else
+				states.TitleState.playFreakyMusic();
 			FlxG.mouse.visible = false;
 		}
 
@@ -465,13 +534,15 @@ class NoteOffsetState extends MusicBeatState
 
 	function repositionCombo()
 	{
+		coolText.x = getComboPos();
+
 		rating.screenCenter();
-		rating.x = coolText.x - 40 + ClientPrefs.data.comboOffset[0];
-		rating.y -= 60 + ClientPrefs.data.comboOffset[1];
+		rating.x = coolText.x - 40 + getComboOffset()[0];
+		rating.y -= 60 + getComboOffset()[1];
 
 		comboNums.screenCenter();
-		comboNums.x = coolText.x - 90 + ClientPrefs.data.comboOffset[2];
-		comboNums.y += 80 - ClientPrefs.data.comboOffset[3];
+		comboNums.x = coolText.x - 90 + getComboOffset()[2];
+		comboNums.y += 80 - getComboOffset()[3];
 		reloadTexts();
 	}
 
@@ -499,10 +570,10 @@ class NoteOffsetState extends MusicBeatState
 		{
 			switch(i)
 			{
-				case 0: dumbTexts.members[i].text = Language.getPhrase('combo_rating_offset', 'Rating Offset:');
-				case 1: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[0] + ', ' + ClientPrefs.data.comboOffset[1] + ']';
-				case 2: dumbTexts.members[i].text = Language.getPhrase('combo_numbers_offset', 'Numbers Offset:');
-				case 3: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[2] + ', ' + ClientPrefs.data.comboOffset[3] + ']';
+				case 0: dumbTexts.members[i].text = 'Rating Offset:';
+				case 1: dumbTexts.members[i].text = '[' + getComboOffset()[0] + ', ' + getComboOffset()[1] + ']';
+				case 2: dumbTexts.members[i].text = 'Numbers Offset:';
+				case 3: dumbTexts.members[i].text = '[' + getComboOffset()[2] + ', ' + getComboOffset()[3] + ']';
 			}
 		}
 	}
@@ -510,7 +581,7 @@ class NoteOffsetState extends MusicBeatState
 	function updateNoteDelay()
 	{
 		ClientPrefs.data.noteOffset = Math.round(barPercent);
-		timeTxt.text = Language.getPhrase('delay_current_offset', 'Current offset: {1} ms', [Math.floor(barPercent)]);
+		timeTxt.text = 'Current offset: ' + Math.floor(barPercent) + ' ms';
 	}
 
 	function updateMode()
@@ -531,17 +602,26 @@ class NoteOffsetState extends MusicBeatState
 			controllerPointer.visible = controls.controllerMode;
 		}
 
+		removeTouchPad();
+
 		var str:String;
 		var str2:String;
-		if(onComboMenu)
-			str = Language.getPhrase('combo_offset', 'Combo Offset');
-		else
-			str = Language.getPhrase('note_delay', 'Note/Beat Delay');
+		if(onComboMenu) {
+			str = 'Combo Offset';
+			addTouchPad('NONE', 'A_B_C');
+			addTouchPadCamera();
+		} else {
+			str = 'Note/Beat Delay';
+			addTouchPad('LEFT_FULL', 'A_B_C');
+			addTouchPadCamera();
+		}
 
-		if(!controls.controllerMode)
-			str2 = Language.getPhrase('switch_on_accept', '(Press Accept to Switch)');
+		if(controls.mobileC)
+			str2 = '(Press A to Switch)';
+		else if(!controls.controllerMode)
+			str2 = '(Press Accept to Switch)';
 		else
-			str2 = Language.getPhrase('switch_on_start', '(Press Start to Switch)');
+			str2 = '(Press Start to Switch)';
 
 		changeModeText.text = '< ${str.toUpperCase()} ${str2.toUpperCase()} >';
 	}
