@@ -1,7 +1,11 @@
 package objects;
 
+#if MODS_ALLOWED
+import backend.io.PsychFile as File;
+import backend.io.PsychFileSystem as FileSystem;
+#end
 import openfl.utils.Assets;
-import haxe.Json;
+import tjson.TJSON as Json;
 
 typedef MenuCharacterFile = {
 	var image:String;
@@ -10,7 +14,6 @@ typedef MenuCharacterFile = {
 	var idle_anim:String;
 	var confirm_anim:String;
 	var flipX:Bool;
-	var antialiasing:Null<Bool>;
 }
 
 class MenuCharacter extends FlxSprite
@@ -23,6 +26,7 @@ class MenuCharacter extends FlxSprite
 	{
 		super(x);
 
+		antialiasing = ClientPrefs.data.antialiasing;
 		changeCharacter(character);
 	}
 
@@ -36,9 +40,6 @@ class MenuCharacter extends FlxSprite
 		var dontPlayAnim:Bool = false;
 		scale.set(1, 1);
 		updateHitbox();
-		
-		color = FlxColor.WHITE;
-		alpha = 1;
 
 		hasConfirmAnimation = false;
 		switch(character) {
@@ -47,33 +48,28 @@ class MenuCharacter extends FlxSprite
 				dontPlayAnim = true;
 			default:
 				var characterPath:String = 'images/menucharacters/' + character + '.json';
+				var rawJson = null;
 
-				var path:String = Paths.getPath(characterPath, TEXT);
 				#if MODS_ALLOWED
-				if (!FileSystem.exists(path))
+				var path:String = Paths.modFolders(characterPath);
+				if (!FileSystem.exists(path)) {
+					path = Paths.getPreloadPath(characterPath);
+				}
+
+				if(!FileSystem.exists(path)) {
+					path = Paths.getPreloadPath('images/menucharacters/' + DEFAULT_CHARACTER + '.json');
+				}
+				rawJson = File.getContent(path);
+
 				#else
-				if (!Assets.exists(path))
+				var path:String = Paths.getPreloadPath(characterPath);
+				if(!Assets.exists(path)) {
+					path = Paths.getPreloadPath('images/menucharacters/' + DEFAULT_CHARACTER + '.json');
+				}
+				rawJson = Assets.getText(path);
 				#end
-				{
-					path = Paths.getSharedPath('characters/' + DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
-					color = FlxColor.BLACK;
-					alpha = 0.6;
-				}
-
-				var charFile:MenuCharacterFile = null;
-				try
-				{
-					#if MODS_ALLOWED
-					charFile = Json.parse(File.getContent(path));
-					#else
-					charFile = Json.parse(Assets.getText(path));
-					#end
-				}
-				catch(e:Dynamic)
-				{
-					trace('Error loading menu character file of "$character": $e');
-				}
-
+				
+				var charFile:MenuCharacterFile = cast Json.parse(rawJson);
 				frames = Paths.getSparrowAtlas('menucharacters/' + charFile.image);
 				animation.addByPrefix('idle', charFile.idle_anim, 24);
 
@@ -84,17 +80,15 @@ class MenuCharacter extends FlxSprite
 					if (animation.getByName('confirm') != null) //check for invalid animation
 						hasConfirmAnimation = true;
 				}
+
 				flipX = (charFile.flipX == true);
 
-				if(charFile.scale != 1)
-				{
+				if(charFile.scale != 1) {
 					scale.set(charFile.scale, charFile.scale);
 					updateHitbox();
 				}
 				offset.set(charFile.position[0], charFile.position[1]);
 				animation.play('idle');
-
-				antialiasing = (charFile.antialiasing != false && ClientPrefs.data.antialiasing);
 		}
 	}
 }
