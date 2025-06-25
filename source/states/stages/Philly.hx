@@ -3,8 +3,11 @@ package states.stages;
 import states.stages.objects.*;
 import objects.Character;
 
+@:publicFields
 class Philly extends BaseStage
 {
+	var bg:BGSprite;
+	var city:BGSprite;
 	var phillyLightsColors:Array<FlxColor>;
 	var phillyWindow:BGSprite;
 	var phillyStreet:BGSprite;
@@ -21,31 +24,32 @@ class Philly extends BaseStage
 	override function create()
 	{
 		if(!ClientPrefs.data.lowQuality) {
-			var bg:BGSprite = new BGSprite('philly/sky', -100, 0, 0.1, 0.1);
+			bg = new BGSprite('philly/sky', -120, -50, 0.1, 0.1);
 			add(bg);
 		}
 
-		var city:BGSprite = new BGSprite('philly/city', -10, 0, 0.3, 0.3);
-		city.setGraphicSize(Std.int(city.width * 0.85));
+		city = new BGSprite('philly/city', -80, 0, 0.1, 0.3);
+		city.setGraphicSize(Std.int(city.width * 0.9));
 		city.updateHitbox();
 		add(city);
 
 		phillyLightsColors = [0xFF31A2FD, 0xFF31FD8C, 0xFFFB33F5, 0xFFFD4531, 0xFFFBA633];
-		phillyWindow = new BGSprite('philly/window', city.x, city.y, 0.3, 0.3);
-		phillyWindow.setGraphicSize(Std.int(phillyWindow.width * 0.85));
+		phillyWindow = new BGSprite('philly/window', city.x, city.y, 0.1, 0.3);
+		phillyWindow.setGraphicSize(Std.int(phillyWindow.width * 0.9));
 		phillyWindow.updateHitbox();
 		add(phillyWindow);
 		phillyWindow.alpha = 0;
 
 		if(!ClientPrefs.data.lowQuality) {
-			var streetBehind:BGSprite = new BGSprite('philly/behindTrain', -40, 50);
+			var streetBehind:BGSprite = new BGSprite('philly/behindTrain', -100, 50);
 			add(streetBehind);
 		}
 
 		phillyTrain = new PhillyTrain(2000, 360);
 		add(phillyTrain);
 
-		phillyStreet = new BGSprite('philly/street', -40, 50);
+		phillyStreet = new BGSprite('philly/street', -70, 50);
+		phillyStreet.setGraphicSize(Std.int(phillyStreet.width * 1.05));
 		add(phillyStreet);
 	}
 	override function eventPushed(event:objects.Note.EventNote)
@@ -63,12 +67,13 @@ class Philly extends BaseStage
 				phillyWindowEvent.visible = false;
 				insert(members.indexOf(blammedLightsBlack) + 1, phillyWindowEvent);
 
-				phillyGlowGradient = new PhillyGlowGradient(-400, 225);
+
+				phillyGlowGradient = new PhillyGlowGradient(-400, 225); //This shit was refusing to properly load FlxGradient so fuck it
 				phillyGlowGradient.visible = false;
 				insert(members.indexOf(blammedLightsBlack) + 1, phillyGlowGradient);
 				if(!ClientPrefs.data.flashing) phillyGlowGradient.intendedAlpha = 0.7;
 
-				Paths.image('philly/particle'); //precache philly glow particle image
+				precacheImage('philly/particle'); //precache philly glow particle image
 				phillyGlowParticles = new FlxTypedGroup<PhillyGlowParticle>();
 				phillyGlowParticles.visible = false;
 				insert(members.indexOf(phillyGlowGradient) + 1, phillyGlowParticles);
@@ -77,14 +82,21 @@ class Philly extends BaseStage
 
 	override function update(elapsed:Float)
 	{
-		phillyWindow.alpha -= (Conductor.crochet / 1000) * elapsed * 1.5;
+		phillyWindow.alpha -= (Conductor.crochet / 1000) * FlxG.elapsed * 1.5;
 		if(phillyGlowParticles != null)
 		{
-			phillyGlowParticles.forEachAlive(function(particle:PhillyGlowParticle)
+			var i:Int = phillyGlowParticles.members.length-1;
+			while (i > 0)
 			{
+				var particle = phillyGlowParticles.members[i];
 				if(particle.alpha <= 0)
+				{
 					particle.kill();
-			});
+					phillyGlowParticles.remove(particle, true);
+					particle.destroy();
+				}
+				--i;
+			}
 		}
 	}
 
@@ -187,11 +199,7 @@ class Philly extends BaseStage
 							{
 								for (i in 0...particlesNum)
 								{
-									var particle:PhillyGlowParticle = phillyGlowParticles.recycle(PhillyGlowParticle);
-									particle.x = -400 + width * i + FlxG.random.float(-width / 5, width / 5);
-									particle.y = phillyGlowGradient.originalY + 200 + (FlxG.random.float(0, 125) + j * 40);
-									particle.color = color;
-									particle.start();
+									var particle:PhillyGlowParticle = new PhillyGlowParticle(-400 + width * i + FlxG.random.float(-width / 5, width / 5), phillyGlowGradient.originalY + 200 + (FlxG.random.float(0, 125) + j * 40), color);
 									phillyGlowParticles.add(particle);
 								}
 							}
