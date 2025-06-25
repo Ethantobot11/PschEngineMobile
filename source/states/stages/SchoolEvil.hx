@@ -4,7 +4,12 @@ import flixel.addons.effects.FlxTrail;
 import states.stages.objects.*;
 import substates.GameOverSubstate;
 import cutscenes.DialogueBox;
+
+#if MODS_ALLOWED
+import backend.io.PsychFileSystem as FileSystem;
+#else
 import openfl.utils.Assets as OpenFlAssets;
+#end
 
 class SchoolEvil extends BaseStage
 {
@@ -84,16 +89,7 @@ class SchoolEvil extends BaseStage
 	var doof:DialogueBox = null;
 	function initDoof()
 	{
-		var file:String = Paths.txt('$songName/${songName}Dialogue_${ClientPrefs.data.language}'); //Checks for vanilla/Senpai dialogue
-		#if MODS_ALLOWED
-		if (!FileSystem.exists(file))
-		#else
-		if (!OpenFlAssets.exists(file))
-		#end
-		{
-			file = Paths.txt('$songName/${songName}Dialogue');
-		}
-
+		var file:String = Paths.txt(songName + '/' + songName + 'Dialogue'); //Checks for vanilla/Senpai dialogue
 		#if MODS_ALLOWED
 		if (!FileSystem.exists(file))
 		#else
