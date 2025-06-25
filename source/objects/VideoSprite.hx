@@ -27,7 +27,10 @@ class VideoSprite extends FlxSpriteGroup {
 
 		this.videoName = videoName;
 		scrollFactor.set();
-		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
+		if (FlxG.state is PlayState)
+			cameras = [PlayState.instance.camOther];
+		else
+			cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
 
 		waiting = isWaiting;
 		if(!waiting)
@@ -46,7 +49,7 @@ class VideoSprite extends FlxSpriteGroup {
 		if(canSkip) this.canSkip = true;
 
 		// callbacks
-		if(!shouldLoop) videoSprite.bitmap.onEndReached.add(finishVideo);
+		if(!shouldLoop) videoSprite.bitmap.onEndReached.add(destroy);
 
 		videoSprite.bitmap.onFormatSetup.add(function()
 		{
@@ -79,8 +82,9 @@ class VideoSprite extends FlxSpriteGroup {
 			remove(cover);
 			cover.destroy();
 		}
-		
-		finishCallback = null;
+
+		if(finishCallback != null)
+			finishCallback();
 		onSkip = null;
 
 		if(FlxG.state != null)
@@ -93,16 +97,6 @@ class VideoSprite extends FlxSpriteGroup {
 		}
 		super.destroy();
 		alreadyDestroyed = true;
-	}
-	function finishVideo()
-	{
-		if (!alreadyDestroyed)
-		{
-			if(finishCallback != null)
-				finishCallback();
-			
-			destroy();
-		}
 	}
 
 	override function update(elapsed:Float)
