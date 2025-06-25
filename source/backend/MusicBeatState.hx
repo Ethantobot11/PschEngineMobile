@@ -1,10 +1,15 @@
 package backend;
 
+import flixel.addons.ui.FlxUIState;
+import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxState;
-import backend.PsychCamera;
 
-class MusicBeatState extends FlxState
+class MusicBeatState extends FlxUIState
 {
+	public static var instance:MusicBeatState;
+	
+	private var theWorld:Bool = false;
+
 	private var curSection:Int = 0;
 	private var stepsToDo:Int = 0;
 
@@ -19,40 +24,106 @@ class MusicBeatState extends FlxState
 		return Controls.instance;
 	}
 
-	var _psychCameraInitialized:Bool = false;
+	public var touchPad:TouchPad;
+	public var touchPadCam:FlxCamera;
+	public var hitbox:Hitbox;
+	public var hitboxCam:FlxCamera;
 
-	public var variables:Map<String, Dynamic> = new Map<String, Dynamic>();
-	public static function getVariables()
-		return getState().variables;
+	public function addTouchPad(DPad:String, Action:String)
+	{
+		touchPad = new TouchPad(DPad, Action);
+		add(touchPad);
+	}
+
+	public function removeTouchPad()
+	{
+		if (touchPad != null)
+		{
+			remove(touchPad);
+			touchPad = FlxDestroyUtil.destroy(touchPad);
+		}
+
+		if(touchPadCam != null)
+		{
+			FlxG.cameras.remove(touchPadCam);
+			touchPadCam = FlxDestroyUtil.destroy(touchPadCam);
+		}
+	}
+
+	public function addHitbox(defaultDrawTarget:Bool = false):Void
+	{
+		final extraMode = MobileData.extraActions.get(ClientPrefs.data.extraHints);
+
+		hitbox = new Hitbox(extraMode);
+		//hitbox = MobileData.setButtonsColors(hitbox.instance);
+		hitbox.visible = false;
+
+		hitboxCam = new FlxCamera();
+		hitboxCam.bgColor.alpha = 0;
+		FlxG.cameras.add(hitboxCam, defaultDrawTarget);
+		hitbox.cameras = [hitboxCam];
+
+		add(hitbox);
+	}
+
+	public function removeHitbox()
+	{
+		if (hitbox != null)
+		{
+			remove(hitbox);
+			hitbox = FlxDestroyUtil.destroy(hitbox);
+			hitbox = null;
+		}
+
+		if (hitboxCam != null)
+		{
+			FlxG.cameras.remove(hitboxCam);
+			hitboxCam = FlxDestroyUtil.destroy(hitboxCam);
+		}
+	}
+
+	public function addTouchPadCamera(defaultDrawTarget:Bool = false):Void
+	{
+		if (touchPad != null)
+		{
+			touchPadCam = new FlxCamera();
+			touchPadCam.bgColor.alpha = 0;
+			FlxG.cameras.add(touchPadCam, defaultDrawTarget);
+			touchPad.cameras = [touchPadCam];
+		}
+	}
+
+	override function destroy()
+	{
+		removeTouchPad();
+		removeHitbox();
+		
+		super.destroy();
+	}
+
+	public static var camBeat:FlxCamera;
 
 	override function create() {
+		instance = this;
+		camBeat = FlxG.camera;
 		var skip:Bool = FlxTransitionableState.skipNextTransOut;
 		#if MODS_ALLOWED Mods.updatedOnState = false; #end
-
-		if(!_psychCameraInitialized) initPsychCamera();
 
 		super.create();
 
 		if(!skip) {
-			openSubState(new CustomFadeTransition(0.5, true));
+			openSubState(new CustomFadeTransition(0.7, true));
 		}
 		FlxTransitionableState.skipNextTransOut = false;
 		timePassedOnState = 0;
 	}
 
-	public function initPsychCamera():PsychCamera
-	{
-		var camera = new PsychCamera();
-		FlxG.cameras.reset(camera);
-		FlxG.cameras.setDefaultDrawTarget(camera, true);
-		_psychCameraInitialized = true;
-		//trace('initialized psych camera ' + Sys.cpuTime());
-		return camera;
-	}
-
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		if (theWorld)
+			return super.update(elapsed);
+
 		//everyStep();
 		var oldStep:Int = curStep;
 		timePassedOnState += elapsed;
@@ -131,36 +202,19 @@ class MusicBeatState extends FlxState
 		curStep = lastChange.stepTime + Math.floor(shit);
 	}
 
-	public static function switchState(nextState:FlxState = null) {
-		if(nextState == null) nextState = FlxG.state;
-		if(nextState == FlxG.state)
-		{
-			resetState();
+	// credit to https://github.com/DetectiveBaldi/FNF-PsychEngine/blob/36e982e2e3e78b9b7939ecfff06f5ffdbcd9cca6/source/backend/MusicBeatState.hx
+	override function startOutro(onOutroComplete:() -> Void):Void {
+		if (!FlxTransitionableState.skipNextTransIn) {
+			FlxG.state.openSubState(new CustomFadeTransition(0.6, false));
+
+			CustomFadeTransition.finishCallback = onOutroComplete;
+
 			return;
 		}
 
-		if(FlxTransitionableState.skipNextTransIn) FlxG.switchState(nextState);
-		else startTransition(nextState);
 		FlxTransitionableState.skipNextTransIn = false;
-	}
 
-	public static function resetState() {
-		if(FlxTransitionableState.skipNextTransIn) FlxG.resetState();
-		else startTransition();
-		FlxTransitionableState.skipNextTransIn = false;
-	}
-
-	// Custom made Trans in
-	public static function startTransition(nextState:FlxState = null)
-	{
-		if(nextState == null)
-			nextState = FlxG.state;
-
-		FlxG.state.openSubState(new CustomFadeTransition(0.5, false));
-		if(nextState == FlxG.state)
-			CustomFadeTransition.finishCallback = function() FlxG.resetState();
-		else
-			CustomFadeTransition.finishCallback = function() FlxG.switchState(nextState);
+		onOutroComplete();
 	}
 
 	public static function getState():MusicBeatState {
