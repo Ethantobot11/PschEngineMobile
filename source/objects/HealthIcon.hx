@@ -3,12 +3,14 @@ package objects;
 class HealthIcon extends FlxSprite
 {
 	public var sprTracker:FlxSprite;
+	private var isOldIcon:Bool = false;
 	private var isPlayer:Bool = false;
 	private var char:String = '';
 
-	public function new(char:String = 'face', isPlayer:Bool = false, ?allowGPU:Bool = true)
+	public function new(char:String = 'bf', isPlayer:Bool = false, ?allowGPU:Bool = true)
 	{
 		super();
+		isOldIcon = (char == 'bf-old');
 		this.isPlayer = isPlayer;
 		changeIcon(char, allowGPU);
 		scrollFactor.set();
@@ -26,9 +28,9 @@ class HealthIcon extends FlxSprite
 	public function changeIcon(char:String, ?allowGPU:Bool = true) {
 		if(this.char != char) {
 			var name:String = 'icons/' + char;
-			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char; //Older versions of psych engine's support
-			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-face'; //Prevents crash from missing icon
-			
+			if(!Paths.fileExists('images/' + name + '.png', IMAGE) && !Paths.fileExists('images/' + name + '.astc', BINARY)) name = 'icons/icon-' + char; //Older versions of psych engine's support
+			if(!Paths.fileExists('images/' + name + '.png', IMAGE) && !Paths.fileExists('images/' + name + '.astc', BINARY)) name = 'icons/icon-face'; //Prevents crash from missing icon
+
 			var graphic = Paths.image(name, allowGPU);
 			var iSize:Float = Math.round(graphic.width / graphic.height);
 			loadGraphic(graphic, true, Math.floor(graphic.width / iSize), Math.floor(graphic.height));
@@ -47,15 +49,11 @@ class HealthIcon extends FlxSprite
 		}
 	}
 
-	public var autoAdjustOffset:Bool = true;
 	override function updateHitbox()
 	{
 		super.updateHitbox();
-		if(autoAdjustOffset)
-		{
-			offset.x = iconOffsets[0];
-			offset.y = iconOffsets[1];
-		}
+		offset.x = iconOffsets[0];
+		offset.y = iconOffsets[1];
 	}
 
 	public function getCharacter():String {
