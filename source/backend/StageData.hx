@@ -1,19 +1,25 @@
 package backend;
 
-import openfl.utils.Assets;
-import haxe.Json;
-import backend.Song;
 import psychlua.ModchartSprite;
+import json2object.JsonParser;
+#if MODS_ALLOWED
+import backend.io.PsychFile as File;
+import backend.io.PsychFileSystem as FileSystem;
+#else
+import openfl.utils.Assets;
+#end
+import tjson.TJSON as Json;
+import backend.Song;
 
 typedef StageFile = {
 	var directory:String;
 	var defaultZoom:Float;
-	@:optional var isPixelStage:Null<Bool>;
+	var isPixelStage:Bool;
 	var stageUI:String;
 
-	var boyfriend:Array<Dynamic>;
-	var girlfriend:Array<Dynamic>;
-	var opponent:Array<Dynamic>;
+	var boyfriend:Array<Float>;
+	var girlfriend:Array<Float>;
+	var opponent:Array<Float>;
 	var hide_girlfriend:Bool;
 
 	var camera_boyfriend:Array<Float>;
@@ -21,9 +27,12 @@ typedef StageFile = {
 	var camera_girlfriend:Array<Float>;
 	var camera_speed:Null<Float>;
 
+	@:optional var characterFeetPos:Bool; // vslice character positioning
+	@:optional var stage3D:online.away.DataProps.StageData3D;
+
+	// 1.0 stuffs
 	@:optional var preload:Dynamic;
 	@:optional var objects:Array<Dynamic>;
-	@:optional var _editorMeta:Dynamic;
 }
 
 enum abstract LoadFilters(Int) from Int from UInt to Int to UInt
@@ -41,6 +50,7 @@ class StageData {
 		return {
 			directory: "",
 			defaultZoom: 0.9,
+			isPixelStage: false,
 			stageUI: "normal",
 
 			boyfriend: [770, 100],
@@ -51,43 +61,70 @@ class StageData {
 			camera_boyfriend: [0, 0],
 			camera_opponent: [0, 0],
 			camera_girlfriend: [0, 0],
-			camera_speed: 1,
-
-			_editorMeta: {
-				gf: "gf",
-				dad: "dad",
-				boyfriend: "bf"
-			}
+			camera_speed: 1
 		};
 	}
 
 	public static var forceNextDirectory:String = null;
 	public static function loadDirectory(SONG:SwagSong) {
 		var stage:String = '';
-		if(SONG.stage != null)
+		if(SONG.stage != null) {
 			stage = SONG.stage;
-		else if(Song.loadedSongName != null)
-			stage = vanillaSongStage(Paths.formatToSongPath(Song.loadedSongName));
-		else
+		} else if(SONG.song != null) {
+			switch (SONG.song.toLowerCase().replace(' ', '-'))
+			{
+				case 'spookeez' | 'south' | 'monster':
+					stage = 'spooky';
+				case 'pico' | 'blammed' | 'philly' | 'philly-nice':
+					stage = 'philly';
+				case 'milf' | 'satin-panties' | 'high':
+					stage = 'limo';
+				case 'cocoa' | 'eggnog':
+					stage = 'mall';
+				case 'winter-horrorland':
+					stage = 'mallEvil';
+				case 'senpai' | 'roses':
+					stage = 'school';
+				case 'thorns':
+					stage = 'schoolEvil';
+				case 'ugh' | 'guns' | 'stress':
+					stage = 'tank';
+				default:
+					stage = 'stage';
+			}
+		} else {
 			stage = 'stage';
+		}
 
 		var stageFile:StageFile = getStageFile(stage);
-		forceNextDirectory = (stageFile != null) ? stageFile.directory : ''; //preventing crashes
+		if(stageFile == null) { //preventing crashes
+			forceNextDirectory = '';
+		} else {
+			forceNextDirectory = stageFile.directory;
+		}
 	}
 
 	public static function getStageFile(stage:String):StageFile {
-		try
-		{
-			var path:String = Paths.getPath('stages/' + stage + '.json', TEXT, null, true);
-			#if MODS_ALLOWED
-			if(FileSystem.exists(path))
-				return cast tjson.TJSON.parse(File.getContent(path));
-			#else
-			if(Assets.exists(path))
-				return cast tjson.TJSON.parse(Assets.getText(path));
-			#end
+		var rawJson:String = null;
+		var path:String = Paths.getPreloadPath('stages/' + stage + '.json');
+
+		#if MODS_ALLOWED
+		var modPath:String = Paths.modFolders('stages/' + stage + '.json');
+		if(FileSystem.exists(modPath)) {
+			rawJson = File.getContent(modPath);
+		} else if(FileSystem.exists(path)) {
+			rawJson = File.getContent(path);
 		}
-		return dummy();
+		#else
+		if(Assets.exists(path)) {
+			rawJson = Assets.getText(path);
+		}
+		#end
+		else
+		{
+			return null;
+		}
+		return cast Json.parse(rawJson);
 	}
 
 	public static function vanillaSongStage(songName):String
@@ -114,6 +151,7 @@ class StageData {
 		return 'stage';
 	}
 
+	// PSYCH ENGINE 1.0 STUFFS
 	public static var reservedNames:Array<String> = ['gf', 'gfGroup', 'dad', 'dadGroup', 'boyfriend', 'boyfriendGroup']; //blocks these names from being used on stage editor's name input text
 	public static function addObjectsToState(objectList:Array<Dynamic>, gf:FlxSprite, dad:FlxSprite, boyfriend:FlxSprite, ?group:Dynamic = null, ?ignoreFilters:Bool = false)
 	{
