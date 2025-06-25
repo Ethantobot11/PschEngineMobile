@@ -6,7 +6,7 @@ class Rating
 {
 	public var name:String = '';
 	public var image:String = '';
-	public var hitWindow:Null<Float> = 0.0; //ms
+	public var hitWindow:Null<Int> = 0; //ms
 	public var ratingMod:Float = 1;
 	public var score:Int = 350;
 	public var noteSplash:Bool = true;
@@ -21,7 +21,15 @@ class Rating
 		var window:String = name + 'Window';
 		try
 		{
-			this.hitWindow = Reflect.field(ClientPrefs.data, window);
+			switch (window) {
+				case "sickWindow": 
+					this.hitWindow = 45;
+				case "goodWindow":
+					this.hitWindow = 90;
+				case "badWindow":
+					this.hitWindow = 135;
+			}
+			//this.hitWindow = Reflect.field(ClientPrefs.data, window);
 		}
 		catch(e) FlxG.log.error(e);
 	}
